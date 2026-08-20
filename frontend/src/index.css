@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+/* Optional custom overrides or fonts can go here */
+@theme {
+  --color-primary-50: #f5f3ff;
+  --color-primary-100: #ede9fe;
+  --color-primary-500: #8b5cf6;
+  --color-primary-600: #7c3aed;
+  --color-primary-700: #6d28d9;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #0b0f19; /* Default rich dark mode background */
+  color: #f3f4f6;
+  min-height: 100vh;
+}

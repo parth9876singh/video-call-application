@@ -1,0 +1,19 @@
+# Dependency directories
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Environment files
+.env
+backend/.env
+frontend/.env
+frontend/.env.local
+
+# Build outputs
+frontend/dist/
+
+# OS/Editor configs
+.DS_Store
+.vscode/
+.idea/
+*.log
