@@ -13,6 +13,9 @@ import userRoutes from './routes/user.routes.js';
 
 const app = express();
 
+// Trust reverse proxy for Render / load balancer IP rate-limiting & secure cookies
+app.set('trust proxy', 1);
+
 // Security Middlewares
 app.use(helmet());
 

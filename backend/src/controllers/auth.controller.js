@@ -11,11 +11,12 @@ const sendTokenResponse = (user, statusCode, res) => {
     expiresIn: '7d', // Token expires in 7 days
   });
 
+  const isProd = process.env.NODE_ENV === 'production';
   const cookieOptions = {
     expires: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days in ms
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
   };
 
   logger.info(`Session started for user: ${user.email}`);
@@ -95,11 +96,12 @@ export const login = async (req, res, next) => {
 // @route   POST /api/auth/logout
 // @access  Private
 export const logout = (req, res) => {
+  const isProd = process.env.NODE_ENV === 'production';
   res.cookie('token', 'none', {
     expires: new Date(Date.now() + 1000),
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
   });
 
   logger.info(`Session cleared.`);
