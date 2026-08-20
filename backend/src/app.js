@@ -50,6 +50,15 @@ app.use('/api/auth', authRoutes);
 // Mount User Routes
 app.use('/api/users', userRoutes);
 
+// Root endpoint for Render deployment health check bots
+app.all('/', (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: 'Video Call API Service is Live',
+    health: '/health'
+  });
+});
+
 // Health Check Endpoint (returns server and db status)
 app.get('/health', (req, res) => {
   const dbState = mongoose.connection.readyState;
