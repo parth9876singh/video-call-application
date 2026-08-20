@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
 import logger from '../utils/logger.js';
+import { registerCallHandlers } from './call.signaling.js';
 
 let io = null;
 
@@ -129,6 +130,9 @@ export const initSocket = (server) => {
     } catch (err) {
       logger.error('Error fetching online users list for presence:update:', err);
     }
+
+    // WebRTC signaling (SDP / ICE / call control only — never media)
+    registerCallHandlers(socket, io, { getUserActiveSockets });
 
     // Disconnect Handler
     socket.on('disconnect', async () => {

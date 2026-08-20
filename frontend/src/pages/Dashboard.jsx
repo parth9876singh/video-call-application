@@ -2,12 +2,14 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { useCall } from '../context/CallContext';
 import UserCard from '../components/dashboard/UserCard';
 import api from '../services/api';
 
 const Dashboard = () => {
   const { user, backendStatus } = useAuth();
   const { onlineUserIds, onlineUserProfiles } = useSocket();
+  const { initiateCall, isInCall, error: callError } = useCall();
   const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -67,8 +69,17 @@ const Dashboard = () => {
     }
   };
 
-  const handleCallUserMock = (targetUser) => {
-    alert(`Calling ${targetUser.name} (${targetUser.email})...\n(P2P WebRTC signaling triggers in Phase 4!)`);
+  const handleCallUser = async (targetUser) => {
+    if (!targetUser?._id) return;
+    if (user?._id && targetUser._id.toString() === user._id.toString()) {
+      setError('You cannot call yourself.');
+      return;
+    }
+    if (isInCall) {
+      setError('You are already in a call.');
+      return;
+    }
+    await initiateCall(targetUser);
   };
 
   const renderOwnAvatar = () => {
@@ -194,9 +205,9 @@ const Dashboard = () => {
             </div>
 
             {/* Error messaging */}
-            {error && (
+            {(error || callError) && (
               <div className="bg-rose-500/15 border border-rose-500/30 text-rose-300 rounded-lg p-3 text-xs mb-4 text-left">
-                {error}
+                {error || callError?.message}
               </div>
             )}
 
@@ -216,7 +227,7 @@ const Dashboard = () => {
                     <UserCard
                       key={item._id}
                       user={updatedUser}
-                      onCallClick={handleCallUserMock}
+                      onCallClick={handleCallUser}
                     />
                   );
                 })}
