@@ -1,22 +1,61 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import UserCard from '../components/dashboard/UserCard';
 import api from '../services/api';
 
 const Dashboard = () => {
   const { user, backendStatus } = useAuth();
+  const [users, setUsers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalResults, setTotalResults] = useState(0);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [healthStatus, setHealthStatus] = useState(null);
   const [healthLoading, setHealthLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Fetch users from search API
+  const fetchUsers = useCallback(async (query = '', pageNum = 1) => {
+    setSearchLoading(true);
+    setError(null);
+    try {
+      const response = await api.get(`/users/search?q=${encodeURIComponent(query)}&page=${pageNum}&limit=5`);
+      if (response.data?.success) {
+        setUsers(response.data.users);
+        setTotalPages(response.data.pagination.totalPages);
+        setTotalResults(response.data.pagination.totalResults);
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to fetch user list');
+    } finally {
+      setSearchLoading(false);
+    }
+  }, []);
+
+  // Fetch initial user list and handle search input changes
+  useEffect(() => {
+    // Initial fetch on mount
+    fetchUsers(searchQuery, page);
+  }, [page, fetchUsers]);
+
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    setPage(1); // Reset page to 1 on new search
+    fetchUsers(searchQuery, 1);
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    setPage(1);
+    fetchUsers('', 1);
+  };
 
   const fetchHealth = async () => {
     setHealthLoading(true);
     setError(null);
     try {
-      // Direct call to /health endpoint which checks DB state, process uptime, etc.
-      // Axios instance has /api suffix, but health is on root /, so let's call it via direct axios request or customize
-      // Wait, let's see. The backend app.js maps `/health` on the root level!
-      // Since our Axios instance is configured with `/api`, we can request `../../health` or make a direct Axios request.
-      // Let's call `/health` relative to API URL.
       const response = await api.get('/../health');
       setHealthStatus(response.data);
     } catch (err) {
@@ -26,118 +65,188 @@ const Dashboard = () => {
     }
   };
 
+  const handleCallUserMock = (targetUser) => {
+    alert(`Calling ${targetUser.name} (${targetUser.email})...\n(P2P WebRTC signaling triggers in Phase 4!)`);
+  };
+
+  const renderOwnAvatar = () => {
+    if (user?.avatar && user.avatar.startsWith('linear-gradient')) {
+      return (
+        <div 
+          style={{ background: user.avatar }}
+          className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-white text-2xl shadow-lg border border-slate-750"
+        >
+          {user.name.charAt(0).toUpperCase()}
+        </div>
+      );
+    }
+    return (
+      <img
+        src={user?.avatar || 'https://api.dicebear.com/7.x/bottts/svg'}
+        alt="Your avatar"
+        onError={(e) => { e.target.src = 'https://api.dicebear.com/7.x/bottts/svg'; }}
+        className="w-16 h-16 rounded-full object-cover border border-slate-800"
+      />
+    );
+  };
+
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8">
-      {/* Hero Welcome Panel */}
-      <section className="bg-slate-900/60 border border-slate-800 rounded-2xl p-8 mb-8 backdrop-blur-sm text-center relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-violet-600/10 rounded-full blur-3xl -z-10"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-fuchsia-600/10 rounded-full blur-3xl -z-10"></div>
+    <div className="max-w-6xl mx-auto px-4 py-8">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        {/* Left Column: Logged-in User Profile Summary & Health Check */}
+        <div className="lg:col-span-4 space-y-6">
+          {/* User Profile Card */}
+          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-violet-600/5 rounded-full blur-2xl -z-10"></div>
+            
+            <div className="flex items-center space-x-4">
+              {renderOwnAvatar()}
+              <div className="text-left">
+                <h3 className="font-bold text-slate-200 text-base">{user?.name}</h3>
+                <p className="text-xs text-slate-500">{user?.email}</p>
+                <div className="mt-1 flex items-center space-x-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span className="text-[10px] text-emerald-400 font-semibold uppercase tracking-wider">Online</span>
+                </div>
+              </div>
+            </div>
 
-        <h1 className="text-3xl font-extrabold tracking-tight md:text-4xl bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent mb-4">
-          Establish the Connection
-        </h1>
-        <p className="text-slate-400 max-w-xl mx-auto mb-6 text-sm md:text-base leading-relaxed">
-          Welcome to the foundations of <b>VibeCall</b>. The backend infrastructure is setup, environment variables are loaded, and MongoDB is linked.
-        </p>
+            <div className="mt-4 pt-4 border-t border-slate-850 text-left">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">About / Bio</h4>
+              <p className="text-xs text-slate-300 leading-relaxed italic">
+                {user?.bio || '"No bio written yet. Click edit to write one!"'}
+              </p>
+            </div>
 
-        <div className="flex flex-col sm:flex-row justify-center items-center gap-4">
-          <div className="bg-slate-950/80 px-4 py-3 rounded-lg border border-slate-850 flex items-center space-x-3 text-left w-full sm:w-auto">
-            <div className={`w-3 h-3 rounded-full ${backendStatus.connected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></div>
-            <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">API Connection</p>
-              <p className="text-sm font-semibold text-slate-350">{backendStatus.connected ? 'Active' : 'Offline'}</p>
+            <div className="mt-5">
+              <Link
+                to="/profile"
+                className="block text-center text-xs bg-slate-800 hover:bg-slate-750 text-slate-200 py-2 rounded-lg font-semibold border border-slate-700 transition-all active:scale-98"
+              >
+                Edit Profile Settings
+              </Link>
             </div>
           </div>
 
-          <div className="bg-slate-950/80 px-4 py-3 rounded-lg border border-slate-850 flex items-center space-x-3 text-left w-full sm:w-auto">
-            <div className="w-3 h-3 rounded-full bg-violet-500"></div>
-            <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wider font-bold">Vite Server</p>
-              <p className="text-sm font-semibold text-slate-350">HMR Active</p>
+          {/* Diagnostic Panel */}
+          <div className="bg-slate-900/20 border border-slate-850 rounded-xl p-5">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 text-left">Diagnostics</h4>
+            <div className="space-y-4">
+              <button
+                onClick={fetchHealth}
+                disabled={healthLoading}
+                className="w-full text-center text-xs bg-violet-600/20 hover:bg-violet-600/35 text-violet-400 font-semibold py-2 rounded-lg border border-violet-500/20 transition-all disabled:opacity-50"
+              >
+                {healthLoading ? 'Querying...' : 'Quick Uptime Check'}
+              </button>
+
+              {healthStatus && (
+                <div className="bg-slate-950 border border-slate-900 rounded-lg p-3 font-mono text-[10px] text-left text-emerald-400 overflow-x-auto">
+                  <p>Database: {healthStatus.database}</p>
+                  <p>Server Uptime: {Math.round(healthStatus.uptime)}s</p>
+                  <p>Environment: {healthStatus.environment}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
-      </section>
 
-      {/* Health Check and Debug Module */}
-      <section className="bg-slate-900/40 border border-slate-850 rounded-xl p-6 mb-8">
-        <h2 className="text-xl font-bold text-slate-250 mb-3 flex items-center justify-between">
-          <span>Backend Verification</span>
-          <button
-            onClick={fetchHealth}
-            disabled={healthLoading}
-            className="text-xs bg-violet-600 hover:bg-violet-750 text-white font-semibold py-2 px-4 rounded-md shadow-md shadow-violet-600/10 hover:shadow-violet-600/20 active:scale-98 transition-all disabled:opacity-50"
-          >
-            {healthLoading ? 'Fetching...' : 'Query /health Endpoint'}
-          </button>
-        </h2>
-        <p className="text-slate-400 text-xs mb-4">
-          Run integration test directly to verify Mongoose connectivity, node environment configs, and server uptime.
-        </p>
+        {/* Right Column: User Search & Active Call Directory */}
+        <div className="lg:col-span-8 space-y-6">
+          <div className="bg-slate-900/40 border border-slate-800 rounded-2xl p-6 backdrop-blur-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+              <div className="text-left">
+                <h2 className="text-xl font-bold text-slate-200">Call Directory</h2>
+                <p className="text-slate-500 text-xs mt-0.5">Find online contacts and initialize video streams</p>
+              </div>
 
-        {error && (
-          <div className="bg-rose-500/15 border border-rose-500/30 text-rose-300 rounded-lg p-3 text-xs mb-4">
-            <strong>Error:</strong> {error}
+              {/* Search Form */}
+              <form onSubmit={handleSearchSubmit} className="flex w-full sm:w-auto items-center space-x-2">
+                <div className="relative w-full sm:w-60">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search by name or email..."
+                    className="w-full bg-slate-950/80 border border-slate-850 rounded-lg pl-3 pr-8 py-2 text-xs text-slate-350 focus:outline-none focus:border-violet-500 placeholder-slate-600"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={handleClearSearch}
+                      className="absolute right-2.5 top-2.5 text-slate-500 hover:text-slate-300 text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="submit"
+                  disabled={searchLoading}
+                  className="bg-violet-600 hover:bg-violet-700 text-white font-semibold py-2 px-4 rounded-lg text-xs transition-all shadow-md shadow-violet-600/10"
+                >
+                  {searchLoading ? '...' : 'Search'}
+                </button>
+              </form>
+            </div>
+
+            {/* Error messaging */}
+            {error && (
+              <div className="bg-rose-500/15 border border-rose-500/30 text-rose-300 rounded-lg p-3 text-xs mb-4 text-left">
+                {error}
+              </div>
+            )}
+
+            {/* Users List */}
+            {searchLoading ? (
+              <div className="py-20 flex flex-col items-center justify-center space-y-3">
+                <div className="w-8 h-8 border-3 border-violet-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-xs text-slate-500">Querying call directory...</p>
+              </div>
+            ) : users.length > 0 ? (
+              <div className="space-y-3">
+                {users.map((item) => (
+                  <UserCard
+                    key={item._id}
+                    user={item}
+                    onCallClick={handleCallUserMock}
+                  />
+                ))}
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between pt-4 border-t border-slate-850 mt-6 text-xs text-slate-400">
+                    <button
+                      disabled={page === 1}
+                      onClick={() => setPage(prev => Math.max(prev - 1, 1))}
+                      className="px-3 py-1.5 rounded bg-slate-950 border border-slate-850 hover:border-slate-800 disabled:opacity-40 transition-all font-semibold"
+                    >
+                      ← Previous
+                    </button>
+                    <span>
+                      Page {page} of {totalPages} ({totalResults} contacts found)
+                    </span>
+                    <button
+                      disabled={page === totalPages}
+                      onClick={() => setPage(prev => Math.min(prev + 1, totalPages))}
+                      className="px-3 py-1.5 rounded bg-slate-950 border border-slate-850 hover:border-slate-800 disabled:opacity-40 transition-all font-semibold"
+                    >
+                      Next →
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="py-16 text-center border border-dashed border-slate-850 rounded-xl">
+                <p className="text-slate-500 text-xs font-medium">No contacts found in directories.</p>
+                <p className="text-slate-600 text-[10px] mt-1">Try register other test accounts or search another name query.</p>
+              </div>
+            )}
           </div>
-        )}
-
-        {healthStatus ? (
-          <div className="bg-slate-950 border border-slate-850 rounded-lg p-4 font-mono text-xs text-left overflow-x-auto text-emerald-400">
-            <pre>{JSON.stringify(healthStatus, null, 2)}</pre>
-          </div>
-        ) : (
-          <div className="border border-dashed border-slate-800 rounded-lg p-8 text-center text-slate-500 text-xs font-mono">
-            No health record queried. Click the button to request data.
-          </div>
-        )}
-      </section>
-
-      {/* Tech Stack Modules */}
-      <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="bg-slate-900/30 border border-slate-850 rounded-xl p-5">
-          <h3 className="font-semibold text-slate-200 text-sm uppercase tracking-wide mb-3 text-violet-400">Backend Checklist</h3>
-          <ul className="space-y-2 text-xs text-slate-400">
-            <li className="flex items-center space-x-2">
-              <span className="text-emerald-500 font-bold">✓</span>
-              <span>Express server core runtime bound to port 5000</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className="text-emerald-500 font-bold">✓</span>
-              <span>Helmet & CORS protection configured via environment variables</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className="text-emerald-500 font-bold">✓</span>
-              <span>MongoDB Atlas/Local Mongoose integration enabled</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className="text-emerald-500 font-bold">✓</span>
-              <span>Dynamic Morgan request logging and Centralized Error Handling</span>
-            </li>
-          </ul>
         </div>
 
-        <div className="bg-slate-900/30 border border-slate-850 rounded-xl p-5">
-          <h3 className="font-semibold text-slate-200 text-sm uppercase tracking-wide mb-3 text-fuchsia-400">Frontend Checklist</h3>
-          <ul className="space-y-2 text-xs text-slate-400">
-            <li className="flex items-center space-x-2">
-              <span className="text-emerald-500 font-bold">✓</span>
-              <span>React v19 + Vite HMR running</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className="text-emerald-500 font-bold">✓</span>
-              <span>Tailwind CSS v4 initialized & styled</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className="text-emerald-500 font-bold">✓</span>
-              <span>Axios client with dynamic intercepts configured</span>
-            </li>
-            <li className="flex items-center space-x-2">
-              <span className="text-emerald-500 font-bold">✓</span>
-              <span>React Router DOM route structure initialized</span>
-            </li>
-          </ul>
-        </div>
-      </section>
+      </div>
     </div>
   );
 };

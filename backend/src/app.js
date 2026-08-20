@@ -9,6 +9,7 @@ import { errorHandler, AppError } from './middleware/error.middleware.js';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import logger from './utils/logger.js';
 import authRoutes from './routes/auth.routes.js';
+import userRoutes from './routes/user.routes.js';
 
 const app = express();
 
@@ -42,6 +43,9 @@ app.use('/api', apiLimiter);
 
 // Mount Authentication Routes
 app.use('/api/auth', authRoutes);
+
+// Mount User Routes
+app.use('/api/users', userRoutes);
 
 // Health Check Endpoint (returns server and db status)
 app.get('/health', (req, res) => {

@@ -23,3 +23,16 @@ export const loginSchema = z.object({
     .toLowerCase(),
   password: z.string().min(1, { message: 'Password is required' }),
 });
+
+export const updateUserSchema = z.object({
+  name: z.string()
+    .min(2, { message: 'Name must be at least 2 characters long' })
+    .max(50, { message: 'Name cannot exceed 50 characters' })
+    .trim()
+    .optional(),
+  bio: z.string()
+    .max(160, { message: 'Bio cannot exceed 160 characters' })
+    .trim()
+    .optional(),
+  avatar: z.string().trim().optional(),
+});
