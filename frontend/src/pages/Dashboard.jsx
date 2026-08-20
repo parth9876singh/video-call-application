@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import UserCard from '../components/dashboard/UserCard';
 import api from '../services/api';
 
 const Dashboard = () => {
   const { user, backendStatus } = useAuth();
+  const { onlineUserIds, onlineUserProfiles } = useSocket();
   const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -206,13 +208,18 @@ const Dashboard = () => {
               </div>
             ) : users.length > 0 ? (
               <div className="space-y-3">
-                {users.map((item) => (
-                  <UserCard
-                    key={item._id}
-                    user={item}
-                    onCallClick={handleCallUserMock}
-                  />
-                ))}
+                {users.map((item) => {
+                  const isOnline = onlineUserIds.has(item._id);
+                  const lastSeen = onlineUserProfiles[item._id]?.lastSeen || item.lastSeen;
+                  const updatedUser = { ...item, isOnline, lastSeen };
+                  return (
+                    <UserCard
+                      key={item._id}
+                      user={updatedUser}
+                      onCallClick={handleCallUserMock}
+                    />
+                  );
+                })}
 
                 {/* Pagination Controls */}
                 {totalPages > 1 && (
