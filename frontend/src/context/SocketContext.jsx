@@ -7,13 +7,10 @@ const SocketContext = createContext(null);
 export const SocketProvider = ({ children }) => {
   const { user } = useAuth();
   const [socket, setSocket] = useState(null);
-  // Store online user IDs in a Set for O(1) lookups
   const [onlineUserIds, setOnlineUserIds] = useState(new Set());
-  // Store extra online user profiles for rendering directory overlays if needed
   const [onlineUserProfiles, setOnlineUserProfiles] = useState({});
 
   useEffect(() => {
-    // Only connect if the user is authenticated
     if (!user) {
       if (socket) {
         socket.disconnect();
@@ -24,93 +21,90 @@ export const SocketProvider = ({ children }) => {
       return;
     }
 
-    // Connect to Socket.IO signaling server
     const socketUrl = import.meta.env.VITE_API_BASE_URL 
       ? import.meta.env.VITE_API_BASE_URL.replace('/api', '') 
       : 'http://localhost:5000';
 
-    console.log(`[Socket] Connecting to signaling server: ${socketUrl}`);
-    
+    const userId = user.id || user._id;
+    console.log(`[Socket] Connecting as user "${user.name}" (${userId}) to ${socketUrl}`);
+
     const socketInstance = io(socketUrl, {
-      withCredentials: true, // Crucial for sending HTTP-only authentication cookies
-      transports: ['websocket', 'polling'], // Fallback options
+      withCredentials: true,
+      auth: {
+        userId: userId?.toString(),
+      },
+      transports: ['websocket', 'polling'],
       autoConnect: true,
     });
 
     socketInstance.on('connect', () => {
-      console.log('[Socket] Connected with ID:', socketInstance.id);
+      console.log(`[Socket] Connected successfully for ${user.name} (Socket ID: ${socketInstance.id})`);
     });
 
-    // Listen to full initial presence update
     socketInstance.on('presence:update', (onlineUsersList) => {
-      console.log('[Socket] Presence update list:', onlineUsersList);
-      const ids = new Set(onlineUsersList.map(u => u._id));
+      console.log('[Socket] Online users updated:', onlineUsersList.map(u => u.name));
+      const ids = new Set(onlineUsersList.map(u => (u._id || u.id)?.toString()));
       const profiles = {};
       onlineUsersList.forEach(u => {
-        profiles[u._id] = u;
+        const idStr = (u._id || u.id)?.toString();
+        if (idStr) profiles[idStr] = u;
       });
       setOnlineUserIds(ids);
       setOnlineUserProfiles(profiles);
     });
 
-    // Listen to single user online broadcast
     socketInstance.on('user:online', (userData) => {
-      console.log('[Socket] User went online:', userData.name);
-      setOnlineUserIds((prev) => {
-        const next = new Set(prev);
-        next.add(userData.userId);
-        return next;
-      });
-      setOnlineUserProfiles((prev) => ({
-        ...prev,
-        [userData.userId]: {
-          _id: userData.userId,
-          name: userData.name,
-          email: userData.email,
-          avatar: userData.avatar,
-          bio: userData.bio,
-          isOnline: true,
-        }
-      }));
+      console.log('[Socket] User came online:', userData.name);
+      const idStr = userData.userId?.toString();
+      if (idStr) {
+        setOnlineUserIds((prev) => new Set(prev).add(idStr));
+        setOnlineUserProfiles((prev) => ({
+          ...prev,
+          [idStr]: {
+            _id: idStr,
+            name: userData.name,
+            email: userData.email,
+            avatar: userData.avatar,
+            bio: userData.bio,
+            isOnline: true,
+          }
+        }));
+      }
     });
 
-    // Listen to single user offline broadcast
     socketInstance.on('user:offline', (data) => {
-      console.log('[Socket] User went offline ID:', data.userId);
-      setOnlineUserIds((prev) => {
-        const next = new Set(prev);
-        next.delete(data.userId);
-        return next;
-      });
-      setOnlineUserProfiles((prev) => {
-        const next = { ...prev };
-        if (next[data.userId]) {
-          next[data.userId].isOnline = false;
-          next[data.userId].lastSeen = data.lastSeen;
-        }
-        return next;
-      });
+      console.log('[Socket] User went offline:', data.userId);
+      const idStr = data.userId?.toString();
+      if (idStr) {
+        setOnlineUserIds((prev) => {
+          const next = new Set(prev);
+          next.delete(idStr);
+          return next;
+        });
+        setOnlineUserProfiles((prev) => {
+          const next = { ...prev };
+          if (next[idStr]) {
+            next[idStr].isOnline = false;
+            next[idStr].lastSeen = data.lastSeen;
+          }
+          return next;
+        });
+      }
     });
 
     socketInstance.on('connect_error', (error) => {
       console.error('[Socket] Connection error:', error.message);
     });
 
-    socketInstance.on('disconnect', (reason) => {
-      console.log('[Socket] Disconnected:', reason);
-    });
-
     setSocket(socketInstance);
 
-    // Clean up connections on unmount
     return () => {
-      console.log('[Socket] Disconnecting instance on unmount...');
       socketInstance.disconnect();
     };
   }, [user]);
 
-  // Check if a specific user is currently online
   const isUserOnline = (userId) => {
+    if (!userId) return false;
     return onlineUserIds.has(userId.toString());
   };
 

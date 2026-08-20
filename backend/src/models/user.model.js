@@ -57,20 +57,17 @@ const userSchema = new mongoose.Schema(
 userSchema.index({ name: 1 }); // For fast prefix-based name queries during user search
 userSchema.index({ isOnline: 1, lastSeen: -1 }); // For querying online users or sorting by presence status
 
-// Pre-save hook to hash password if it is modified
-userSchema.pre('save', async function (next) {
+// Pre-save hook to hash password if it is modified.
+// NOTE: In Mongoose v7+, async pre-hooks do NOT receive a `next` callback.
+// Mongoose awaits the returned Promise automatically. Throw errors instead of calling next(err).
+userSchema.pre('save', async function () {
   // Only hash password if it has been modified (or is new)
   if (!this.isModified('passwordHash')) {
-    return next();
+    return;
   }
 
-  try {
-    const salt = await bcrypt.genSalt(12);
-    this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
-    next();
-  } catch (err) {
-    next(err);
-  }
+  const salt = await bcrypt.genSalt(12);
+  this.passwordHash = await bcrypt.hash(this.passwordHash, salt);
 });
 
 // Method to verify passwords

@@ -9,7 +9,7 @@ import api from '../services/api';
 const Dashboard = () => {
   const { user, backendStatus } = useAuth();
   const { onlineUserIds, onlineUserProfiles } = useSocket();
-  const { initiateCall, isInCall, error: callError } = useCall();
+  const { initiateCall, isInCall } = useCall();
   const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -69,17 +69,24 @@ const Dashboard = () => {
     }
   };
 
-  const handleCallUser = async (targetUser) => {
-    if (!targetUser?._id) return;
-    if (user?._id && targetUser._id.toString() === user._id.toString()) {
+  const handleCallUser = (targetUser) => {
+    const currentUserId = user?.id || user?._id;
+    const targetUserId = targetUser?.id || targetUser?._id;
+
+    if (!targetUserId) {
+      setError('Invalid contact selected.');
+      return;
+    }
+    if (currentUserId && targetUserId.toString() === currentUserId.toString()) {
       setError('You cannot call yourself.');
       return;
     }
     if (isInCall) {
-      setError('You are already in a call.');
+      setError('You are already in an active call.');
       return;
     }
-    await initiateCall(targetUser);
+
+    initiateCall(targetUser);
   };
 
   const renderOwnAvatar = () => {
@@ -205,9 +212,9 @@ const Dashboard = () => {
             </div>
 
             {/* Error messaging */}
-            {(error || callError) && (
+            {error && (
               <div className="bg-rose-500/15 border border-rose-500/30 text-rose-300 rounded-lg p-3 text-xs mb-4 text-left">
-                {error || callError?.message}
+                {error}
               </div>
             )}
 
@@ -220,9 +227,10 @@ const Dashboard = () => {
             ) : users.length > 0 ? (
               <div className="space-y-3">
                 {users.map((item) => {
-                  const isOnline = onlineUserIds.has(item._id);
-                  const lastSeen = onlineUserProfiles[item._id]?.lastSeen || item.lastSeen;
-                  const updatedUser = { ...item, isOnline, lastSeen };
+                  const itemIdStr = (item._id || item.id)?.toString();
+                  const isOnline = onlineUserIds.has(itemIdStr);
+                  const lastSeen = onlineUserProfiles[itemIdStr]?.lastSeen || item.lastSeen;
+                  const updatedUser = { ...item, _id: itemIdStr, isOnline, lastSeen };
                   return (
                     <UserCard
                       key={item._id}

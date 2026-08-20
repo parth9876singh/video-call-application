@@ -94,15 +94,13 @@ export const initSocket = (server) => {
     // If this is the user's FIRST active tab/socket connection
     if (socketsSet.size === 1) {
       try {
-        // Update database presence status
         await User.findByIdAndUpdate(userId, {
           isOnline: true,
-          socketId: socket.id // Store primary socket connection ID
+          socketId: socket.id
         });
         
         logger.info(`User went online: ${username} (ID: ${userId})`);
 
-        // Broadcast "user:online" to everyone except the sender
         socket.broadcast.emit('user:online', {
           userId,
           name: username,
@@ -114,24 +112,21 @@ export const initSocket = (server) => {
         logger.error(`Error updating online status for ${username}:`, err);
       }
     } else {
-      // Just update primary socket reference to the latest active tab
       await User.findByIdAndUpdate(userId, { socketId: socket.id }).catch(err => {
         logger.error(`Error updating primary socket reference for ${username}:`, err);
       });
     }
 
-    // Retrieve and emit list of all currently online users to the newly connected client
+    // Emit full online user list to newly connected client
     try {
       const onlineUsers = await User.find({ isOnline: true })
         .select('_id name email avatar bio lastSeen');
-      
-      // Emit "presence:update" with all active online users
       socket.emit('presence:update', onlineUsers);
     } catch (err) {
       logger.error('Error fetching online users list for presence:update:', err);
     }
 
-    // WebRTC signaling (SDP / ICE / call control only — never media)
+    // Register all call signaling handlers (offer/answer/ICE is Phase 5)
     registerCallHandlers(socket, io, { getUserActiveSockets });
 
     // Disconnect Handler
@@ -142,13 +137,11 @@ export const initSocket = (server) => {
       if (userSet) {
         userSet.delete(socket.id);
 
-        // If the user has CLOSED ALL active tabs/connections
         if (userSet.size === 0) {
-          userSockets.delete(userId); // Memory cleanup
+          userSockets.delete(userId);
 
           try {
             const lastSeenTime = new Date();
-            // Update database presence status
             await User.findByIdAndUpdate(userId, {
               isOnline: false,
               socketId: null,
@@ -157,7 +150,6 @@ export const initSocket = (server) => {
 
             logger.info(`User went offline: ${username} (ID: ${userId})`);
 
-            // Broadcast "user:offline" to everyone else
             io.emit('user:offline', {
               userId,
               lastSeen: lastSeenTime
@@ -166,7 +158,6 @@ export const initSocket = (server) => {
             logger.error(`Error updating offline status for ${username}:`, err);
           }
         } else {
-          // If other tabs are still active, update the DB primary socket to one of the remaining socket IDs
           const nextSocketId = Array.from(userSet)[0];
           await User.findByIdAndUpdate(userId, { socketId: nextSocketId }).catch(err => {
             logger.error(`Error updating primary socket reference after tab closure:`, err);
@@ -186,7 +177,7 @@ export const getIO = () => {
   return io;
 };
 
-// Helper to fetch all active sockets of a user (useful for signalling)
+// Helper to fetch all active sockets of a user (used by call signaling)
 export const getUserActiveSockets = (userId) => {
   const sockets = userSockets.get(userId.toString());
   return sockets ? Array.from(sockets) : [];

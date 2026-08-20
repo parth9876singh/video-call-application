@@ -58,6 +58,7 @@ function App() {
                 <p>VibeCall P2P Video Call System &copy; {new Date().getFullYear()} - Designed with React 19 & Tailwind CSS v4</p>
               </footer>
 
+              {/* Global call overlays — rendered outside routes so they persist during navigation */}
               <CallOverlay />
             </div>
           </BrowserRouter>
