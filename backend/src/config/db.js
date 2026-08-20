@@ -8,7 +8,7 @@ const connectDB = async () => {
       throw new Error('MONGODB_URI environment variable is missing.');
     }
 
-    logger.info('Connecting to MongoDB...');
+    logger.info('Connecting to MongoDB Atlas...');
     const conn = await mongoose.connect(connStr);
     
     logger.info(`MongoDB Connected: ${conn.connection.host}/${conn.connection.name}`);
